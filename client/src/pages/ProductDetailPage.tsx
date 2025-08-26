@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useRoute, useLocation } from 'wouter';
 import { useAuth } from '../contexts/AuthContext';
 import { dataService, Product } from '../lib/dataService';
 import { loadPaystackScript, initializePaystackPayment, formatAmountToKobo, generatePaymentReference } from '../lib/paystack';
@@ -20,8 +20,9 @@ import {
 import toast from 'react-hot-toast';
 
 const ProductDetailPage: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
+  const [match, params] = useRoute('/product/:id');
+  const [, setLocation] = useLocation();
+  const id = params?.id;
   const { user, profile } = useAuth();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
@@ -38,22 +39,16 @@ const ProductDetailPage: React.FC = () => {
     if (!id) return;
 
     try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .eq('id', id)
-        .eq('is_active', true)
-        .single();
-
-      if (error) {
-        console.error('Error fetching product:', error);
-        navigate('/products');
+      const data = await dataService.getProduct(id);
+      if (!data) {
+        console.error('Product not found');
+        setLocation('/products');
       } else {
         setProduct(data);
       }
     } catch (error) {
       console.error('Error fetching product:', error);
-      navigate('/products');
+      setLocation('/products');
     } finally {
       setLoading(false);
     }
@@ -62,7 +57,7 @@ const ProductDetailPage: React.FC = () => {
   const handlePurchase = async () => {
     if (!product || !user || !profile) {
       toast.error('Please log in to purchase');
-      navigate('/auth');
+      setLocation('/auth');
       return;
     }
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { Link, useLocation } from 'wouter';
 import { dataService, Product } from '../lib/dataService';
 import { useAuth } from '../contexts/AuthContext';
 import { 
@@ -15,12 +15,15 @@ import {
 import toast from 'react-hot-toast';
 
 const ProductsPage: React.FC = () => {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [location] = useLocation();
   const { user, profile } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
-  const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || 'all');
+  
+  // Parse URL search params manually
+  const urlParams = new URLSearchParams(window.location.search);
+  const [searchTerm, setSearchTerm] = useState(urlParams.get('search') || '');
+  const [selectedCategory, setSelectedCategory] = useState(urlParams.get('category') || 'all');
   const [sortBy, setSortBy] = useState('created_at');
 
   const categories = [
@@ -64,13 +67,14 @@ const ProductsPage: React.FC = () => {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    const params = new URLSearchParams(searchParams);
+    const params = new URLSearchParams(window.location.search);
     if (searchTerm) {
       params.set('search', searchTerm);
     } else {
       params.delete('search');
     }
-    setSearchParams(params);
+    const newUrl = `${window.location.pathname}?${params.toString()}`;
+    window.history.pushState({}, '', newUrl);
     fetchProducts();
   };
 

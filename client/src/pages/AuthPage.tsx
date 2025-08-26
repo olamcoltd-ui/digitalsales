@@ -1,17 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation } from 'wouter';
 import { useAuth } from '../contexts/AuthContext';
 import { Eye, EyeOff, Mail, Lock, User, Users } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const AuthPage: React.FC = () => {
-  const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
+  const [location, setLocation] = useLocation();
   const { signIn, signUp, resetPassword, user } = useAuth();
   
-  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>(
-    (searchParams.get('mode') as 'login' | 'register' | 'forgot') || 'login'
-  );
+  // Parse URL search params manually
+  const urlParams = new URLSearchParams(window.location.search);
+  const modeParam = urlParams.get('mode') as 'login' | 'register' | 'forgot';
+  const refParam = urlParams.get('ref') || '';
+  
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>(modeParam || 'login');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   
@@ -20,14 +22,14 @@ const AuthPage: React.FC = () => {
     password: '',
     confirmPassword: '',
     fullName: '',
-    referralCode: searchParams.get('ref') || ''
+    referralCode: refParam
   });
 
   useEffect(() => {
     if (user) {
-      navigate('/dashboard');
+      setLocation('/dashboard');
     }
-  }, [user, navigate]);
+  }, [user, setLocation]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,7 +38,7 @@ const AuthPage: React.FC = () => {
     try {
       if (mode === 'login') {
         await signIn(formData.email, formData.password);
-        navigate('/dashboard');
+        setLocation('/dashboard');
       } else if (mode === 'register') {
         if (formData.password !== formData.confirmPassword) {
           toast.error('Passwords do not match');

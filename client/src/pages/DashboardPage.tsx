@@ -14,7 +14,7 @@ import {
   Eye
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { Link } from 'react-router-dom';
+import { Link } from 'wouter';
 
 const DashboardPage: React.FC = () => {
   const { user, profile } = useAuth();
