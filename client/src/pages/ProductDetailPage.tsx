@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import { useAuth } from '../contexts/AuthContext';
 import { dataService, Product } from '../lib/dataService';
+import { supabase } from '../lib/supabase';
 import { loadPaystackScript, initializePaystackPayment, formatAmountToKobo, generatePaymentReference } from '../lib/paystack';
 import { 
   Share2, 
@@ -210,7 +211,7 @@ const ProductDetailPage: React.FC = () => {
           <h1 className="text-2xl font-bold text-gray-900 mb-4">Product Not Found</h1>
           <p className="text-gray-600 mb-4">The product you're looking for doesn't exist or is no longer available.</p>
           <button
-            onClick={() => navigate('/products')}
+            onClick={() => setLocation('/products')}
             className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition-colors"
           >
             Browse Products
@@ -225,7 +226,7 @@ const ProductDetailPage: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Back Button */}
         <button
-          onClick={() => navigate('/products')}
+          onClick={() => setLocation('/products')}
           className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 mb-6"
         >
           <ArrowLeft className="w-5 h-5" />
