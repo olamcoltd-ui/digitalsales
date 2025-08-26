@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { dataService, SubscriptionPlan, UserSubscription } from '../lib/dataService';
 import { loadPaystackScript, initializePaystackPayment, formatAmountToKobo, generatePaymentReference } from '../lib/paystack';
-import { CheckCircle, Star, Zap, Crown, Shield } from 'lucide-react';
+import { CheckCircle, Star, Zap, Crown, Shield, TrendingUp, Users } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const SubscriptionPage: React.FC = () => {
@@ -22,16 +22,8 @@ const SubscriptionPage: React.FC = () => {
 
   const fetchPlans = async () => {
     try {
-      const { data, error } = await supabase
-        .from('subscription_plans')
-        .select('*')
-        .order('price', { ascending: true });
-
-      if (error) {
-        console.error('Error fetching plans:', error);
-      } else {
-        setPlans(data || []);
-      }
+      const data = await dataService.getSubscriptionPlans();
+      setPlans(data || []);
     } catch (error) {
       console.error('Error fetching plans:', error);
     }
@@ -41,20 +33,9 @@ const SubscriptionPage: React.FC = () => {
     if (!user) return;
 
     try {
-      const { data, error } = await supabase
-        .from('user_subscriptions')
-        .select(`
-          *,
-          subscription_plans (*)
-        `)
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .single();
-
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error fetching subscription:', error);
-      } else if (data) {
-        setCurrentSubscription(data as any);
+      const data = await dataService.getUserSubscription();
+      if (data && data.plan) {
+        setCurrentSubscription(data as UserSubscription & { plan: SubscriptionPlan });
       }
     } catch (error) {
       console.error('Error fetching subscription:', error);
@@ -115,44 +96,16 @@ const SubscriptionPage: React.FC = () => {
       const endDate = new Date();
       endDate.setMonth(endDate.getMonth() + plan.duration_months);
 
-      // Deactivate current subscription if exists
-      if (currentSubscription) {
-        await supabase
-          .from('user_subscriptions')
-          .update({ status: 'cancelled' })
-          .eq('id', currentSubscription.id);
-      }
+      // Create/update subscription using dataService
+      const success = await dataService.createSubscription({
+        planId,
+        reference,
+        amount: plan.price
+      });
 
-      // Create new subscription
-      const { error } = await supabase
-        .from('user_subscriptions')
-        .insert([{
-          user_id: user.id,
-          plan_id: planId,
-          status: 'active',
-          start_date: new Date().toISOString(),
-          end_date: endDate.toISOString()
-        }]);
-
-      if (error) {
-        console.error('Error creating subscription:', error);
+      if (!success) {
         toast.error('Failed to activate subscription');
       } else {
-        // Record the sale if it's a paid plan
-        if (plan.price > 0) {
-          await supabase
-            .from('sales')
-            .insert([{
-              product_id: planId, // Using plan ID as product ID for subscriptions
-              seller_id: user.id,
-              buyer_email: profile?.email || '',
-              sale_amount: plan.price,
-              commission_amount: 0, // No commission on own subscription
-              admin_amount: plan.price,
-              status: 'completed',
-              transaction_id: reference
-            }]);
-        }
 
         await fetchCurrentSubscription();
         toast.success('Subscription activated successfully!');

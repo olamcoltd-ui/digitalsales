@@ -33,30 +33,16 @@ const WalletPage: React.FC = () => {
     if (!user) return;
 
     try {
-      // Fetch wallet
-      const { data: walletData, error: walletError } = await supabase
-        .from('wallets')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-
-      if (walletError && walletError.code !== 'PGRST116') {
-        console.error('Error fetching wallet:', walletError);
-      } else if (walletData) {
+      // Fetch wallet using dataService
+      const walletData = await dataService.getWallet();
+      if (walletData) {
         setWallet(walletData);
       }
 
-      // Fetch withdrawal requests
-      const { data: withdrawalsData, error: withdrawalsError } = await supabase
-        .from('withdrawal_requests')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (withdrawalsError) {
-        console.error('Error fetching withdrawals:', withdrawalsError);
-      } else {
-        setWithdrawalRequests(withdrawalsData || []);
+      // Fetch withdrawal requests using dataService
+      const withdrawalsData = await dataService.getWithdrawalRequests();
+      if (withdrawalsData) {
+        setWithdrawalRequests(withdrawalsData);
       }
 
     } catch (error) {
@@ -362,22 +348,22 @@ const WithdrawalModal: React.FC<WithdrawalModalProps> = ({ wallet, profile, onCl
       const netAmount = withdrawAmount - processingFee;
       const selectedBankData = banks.find(b => b.code === selectedBank);
 
-      const { error } = await supabase
-        .from('withdrawal_requests')
-        .insert([{
-          user_id: user.id,
-          amount: withdrawAmount,
-          processing_fee: processingFee,
-          net_amount: netAmount,
-          bank_name: selectedBankData?.name || '',
-          bank_code: selectedBank,
-          account_number: accountNumber,
-          account_name: verifiedAccount?.account_name || accountName,
-          status: 'pending'
-        }]);
+      const withdrawalData = {
+        user_id: user.id,
+        amount: withdrawAmount,
+        processing_fee: processingFee,
+        net_amount: netAmount,
+        bank_name: selectedBankData?.name || '',
+        bank_code: selectedBank,
+        account_number: accountNumber,
+        account_name: verifiedAccount?.account_name || accountName,
+        status: 'pending'
+      };
 
-      if (error) {
-        throw error;
+      const result = await dataService.createWithdrawal(withdrawalData);
+
+      if (!result) {
+        throw new Error('Failed to create withdrawal request');
       }
 
       toast.success('Withdrawal request submitted successfully!');

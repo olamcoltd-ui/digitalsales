@@ -98,7 +98,7 @@ class DataService {
 
   async getWallet(): Promise<Wallet | null> {
     try {
-      return await apiClient.getWallet();
+      return await apiClient.getWallet() as Wallet;
     } catch (error) {
       console.error('Error fetching wallet:', error);
       return null;
@@ -107,7 +107,7 @@ class DataService {
 
   async getSales(): Promise<Sale[]> {
     try {
-      return await apiClient.getSales();
+      return await apiClient.getSales() as Sale[];
     } catch (error) {
       console.error('Error fetching sales:', error);
       return [];
@@ -116,7 +116,7 @@ class DataService {
 
   async getProducts(filters?: { category?: string; search?: string }): Promise<Product[]> {
     try {
-      return await apiClient.getProducts(filters);
+      return await apiClient.getProducts(filters) as Product[];
     } catch (error) {
       console.error('Error fetching products:', error);
       return [];
@@ -125,7 +125,7 @@ class DataService {
 
   async getProduct(id: string): Promise<Product | null> {
     try {
-      return await apiClient.getProduct(id);
+      return await apiClient.getProduct(id) as Product;
     } catch (error) {
       console.error('Error fetching product:', error);
       return null;
@@ -134,7 +134,7 @@ class DataService {
 
   async getSubscriptionPlans(): Promise<SubscriptionPlan[]> {
     try {
-      return await apiClient.getSubscriptionPlans();
+      return await apiClient.getSubscriptionPlans() as SubscriptionPlan[];
     } catch (error) {
       console.error('Error fetching subscription plans:', error);
       return [];
@@ -143,7 +143,7 @@ class DataService {
 
   async getUserSubscription(): Promise<UserSubscription | null> {
     try {
-      return await apiClient.getUserSubscription();
+      return await apiClient.getUserSubscription() as UserSubscription | null;
     } catch (error) {
       console.error('Error fetching user subscription:', error);
       return null;
@@ -152,19 +152,33 @@ class DataService {
 
   async getWithdrawals(): Promise<WithdrawalRequest[]> {
     try {
-      return await apiClient.getWithdrawals();
+      return await apiClient.getWithdrawals() as WithdrawalRequest[];
     } catch (error) {
       console.error('Error fetching withdrawals:', error);
       return [];
     }
   }
 
+  async getWithdrawalRequests(): Promise<WithdrawalRequest[]> {
+    return this.getWithdrawals();
+  }
+
   async createWithdrawal(withdrawal: Partial<WithdrawalRequest>): Promise<WithdrawalRequest | null> {
     try {
-      return await apiClient.createWithdrawal(withdrawal);
+      return await apiClient.createWithdrawal(withdrawal) as WithdrawalRequest;
     } catch (error) {
       console.error('Error creating withdrawal:', error);
       return null;
+    }
+  }
+
+  async createSubscription(params: { planId: string; reference: string; amount: number }): Promise<boolean> {
+    try {
+      await apiClient.createSubscription(params);
+      return true;
+    } catch (error) {
+      console.error('Error creating subscription:', error);
+      return false;
     }
   }
 

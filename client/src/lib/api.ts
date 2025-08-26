@@ -105,6 +105,13 @@ class ApiClient {
     return this.request('/user-subscription');
   }
 
+  async createSubscription(params: { planId: string; reference: string; amount: number }) {
+    return this.request('/user-subscription', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  }
+
   // Withdrawal methods
   async getWithdrawals() {
     return this.request('/withdrawals');
