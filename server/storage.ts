@@ -56,6 +56,8 @@ export interface IStorage {
   // Withdrawal operations
   createWithdrawalRequest(request: Partial<WithdrawalRequest>): Promise<WithdrawalRequest>;
   getWithdrawalRequestsByUserId(userId: string): Promise<WithdrawalRequest[]>;
+  getWithdrawalRequestById(id: string): Promise<WithdrawalRequest | undefined>;
+  updateWithdrawalRequest(id: string, updates: Partial<WithdrawalRequest>): Promise<void>;
 }
 
 export class PostgresStorage implements IStorage {
@@ -165,6 +167,15 @@ export class PostgresStorage implements IStorage {
 
   async getWithdrawalRequestsByUserId(userId: string): Promise<WithdrawalRequest[]> {
     return await db.select().from(schema.withdrawalRequests).where(eq(schema.withdrawalRequests.user_id, userId));
+  }
+
+  async getWithdrawalRequestById(id: string): Promise<WithdrawalRequest | undefined> {
+    const result = await db.select().from(schema.withdrawalRequests).where(eq(schema.withdrawalRequests.id, id)).limit(1);
+    return result[0];
+  }
+
+  async updateWithdrawalRequest(id: string, updates: Partial<WithdrawalRequest>): Promise<void> {
+    await db.update(schema.withdrawalRequests).set(updates).where(eq(schema.withdrawalRequests.id, id));
   }
 }
 

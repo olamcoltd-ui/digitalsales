@@ -7,6 +7,180 @@ import crypto from "crypto";
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
+// Helper functions for Paystack operations
+async function handleProductPurchase(paymentData: any, metadata: any) {
+  try {
+    console.log('Handling product purchase for user:', metadata.user_id);
+
+    // Get user's current subscription to calculate commission
+    const subscription = await storage.getUserSubscription(metadata.user_id);
+    const product = await storage.getProductById(metadata.product_id);
+
+    if (!product) {
+      console.error('Product not found:', metadata.product_id);
+      return;
+    }
+
+    const commissionRate = 0.20; // Default for free plan, could be enhanced to check subscription
+    const saleAmount = paymentData.amount / 100; // Convert from kobo
+    const commissionAmount = saleAmount * commissionRate;
+    const adminAmount = saleAmount - commissionAmount;
+
+    console.log('Commission calculation:', {
+      saleAmount,
+      commissionRate,
+      commissionAmount,
+      adminAmount
+    });
+
+    // Record the sale
+    await storage.createSale({
+      product_id: metadata.product_id,
+      seller_id: metadata.user_id,
+      buyer_email: paymentData.customer.email,
+      sale_amount: String(saleAmount),
+      commission_amount: String(commissionAmount),
+      admin_amount: String(adminAmount),
+      status: 'completed',
+      transaction_id: paymentData.reference
+    });
+
+    // Update user wallet
+    await storage.updateWalletBalance(metadata.user_id, commissionAmount);
+
+    console.log('Product purchase processed successfully');
+  } catch (error) {
+    console.error('Error handling product purchase:', error);
+    throw error;
+  }
+}
+
+async function handleSubscriptionPayment(paymentData: any, metadata: any) {
+  try {
+    console.log('Handling subscription payment for user:', metadata.user_id);
+
+    // Create new subscription
+    const endDate = new Date();
+    endDate.setMonth(endDate.getMonth() + 1); // Assuming monthly for now
+
+    await storage.createUserSubscription({
+      user_id: metadata.user_id,
+      plan_id: metadata.plan_id,
+      status: 'active',
+      start_date: new Date(),
+      end_date: endDate
+    });
+
+    console.log('Subscription payment processed successfully');
+  } catch (error) {
+    console.error('Error handling subscription payment:', error);
+    throw error;
+  }
+}
+
+async function handleWithdrawalSuccess(transferData: any) {
+  try {
+    console.log('Handling withdrawal success:', transferData.reference);
+
+    await storage.updateWithdrawalRequest(transferData.reference, {
+      status: 'completed',
+      processed_at: new Date()
+    });
+
+    console.log('Withdrawal success processed');
+  } catch (error) {
+    console.error('Error handling withdrawal success:', error);
+    throw error;
+  }
+}
+
+async function handleWithdrawalFailed(transferData: any) {
+  try {
+    console.log('Handling withdrawal failure:', transferData.reference);
+
+    await storage.updateWithdrawalRequest(transferData.reference, {
+      status: 'failed',
+      processed_at: new Date(),
+      admin_notes: 'Transfer failed - balance refunded'
+    });
+
+    console.log('Withdrawal failure processed');
+  } catch (error) {
+    console.error('Error handling withdrawal failure:', error);
+    throw error;
+  }
+}
+
+async function approveWithdrawal(withdrawal: any, notes?: string) {
+  const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
+  if (!PAYSTACK_SECRET_KEY) {
+    throw new Error('Paystack secret key not configured');
+  }
+
+  // Create transfer recipient
+  const recipientResponse = await fetch('https://api.paystack.co/transferrecipient', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${PAYSTACK_SECRET_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      type: 'nuban',
+      name: withdrawal.account_name,
+      account_number: withdrawal.account_number,
+      bank_code: withdrawal.bank_code,
+      currency: 'NGN'
+    }),
+  });
+
+  const recipientData = await recipientResponse.json();
+
+  if (!recipientData.status) {
+    throw new Error(recipientData.message || 'Failed to create recipient');
+  }
+
+  // Generate unique reference
+  const reference = `withdrawal_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+  // Initiate transfer
+  const transferResponse = await fetch('https://api.paystack.co/transfer', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${PAYSTACK_SECRET_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      source: 'balance',
+      amount: Math.round(Number(withdrawal.net_amount) * 100), // Convert to kobo
+      recipient: recipientData.data.recipient_code,
+      reason: `Withdrawal from Olamco Digital Hub`,
+      reference: reference
+    }),
+  });
+
+  const transferData = await transferResponse.json();
+
+  if (!transferData.status) {
+    throw new Error(transferData.message || 'Failed to initiate transfer');
+  }
+
+  // Update withdrawal request
+  await storage.updateWithdrawalRequest(withdrawal.id, {
+    status: 'processing',
+    reference: reference,
+    admin_notes: notes || 'Transfer initiated',
+    processed_at: new Date()
+  });
+}
+
+async function rejectWithdrawal(withdrawalId: string, notes?: string) {
+  await storage.updateWithdrawalRequest(withdrawalId, {
+    status: 'rejected',
+    admin_notes: notes || 'Withdrawal rejected by admin',
+    processed_at: new Date()
+  });
+}
+
 // Middleware to verify JWT token
 const authenticateToken = (req: any, res: any, next: any) => {
   const authHeader = req.headers['authorization'];
@@ -225,39 +399,151 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Paystack webhook simulation (replace the Supabase functions)
+  // Paystack webhook (migrated from Supabase Edge Functions)
   app.post('/api/paystack-webhook', async (req, res) => {
     try {
       const { event, data } = req.body;
+      console.log('Webhook event received:', event);
       
       if (event === 'charge.success') {
         const metadata = data.metadata;
+        console.log('Processing charge success:', metadata);
         
         if (metadata.type === 'product_purchase') {
-          // Handle product purchase
-          const commissionRate = 0.20; // Default for free plan
-          const saleAmount = data.amount / 100;
-          const commissionAmount = saleAmount * commissionRate;
-          
-          await storage.createSale({
-            product_id: metadata.product_id,
-            seller_id: metadata.user_id,
-            buyer_email: data.customer.email,
-            sale_amount: String(saleAmount),
-            commission_amount: String(commissionAmount),
-            admin_amount: String(saleAmount - commissionAmount),
-            transaction_id: data.reference,
-            status: 'completed'
-          });
-          
-          await storage.updateWalletBalance(metadata.user_id, commissionAmount);
+          await handleProductPurchase(data, metadata);
+        } else if (metadata.type === 'subscription') {
+          await handleSubscriptionPayment(data, metadata);
         }
+      } else if (event === 'transfer.success') {
+        await handleWithdrawalSuccess(data);
+      } else if (event === 'transfer.failed') {
+        await handleWithdrawalFailed(data);
       }
       
       res.json({ received: true });
     } catch (error) {
       console.error('Webhook error:', error);
       res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // Bank verification (migrated from Supabase Edge Functions)
+  app.post('/api/verify-bank-account', async (req, res) => {
+    try {
+      const { account_number, bank_code } = req.body;
+      
+      if (!account_number || !bank_code) {
+        return res.status(400).json({ success: false, error: 'Account number and bank code are required' });
+      }
+
+      const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
+      if (!PAYSTACK_SECRET_KEY) {
+        return res.status(500).json({ success: false, error: 'Paystack secret key not configured' });
+      }
+
+      const response = await fetch(
+        `https://api.paystack.co/bank/resolve?account_number=${account_number}&bank_code=${bank_code}`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${PAYSTACK_SECRET_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      const responseData = await response.json();
+
+      if (!responseData.status) {
+        return res.status(400).json({ success: false, error: responseData.message || 'Failed to verify account' });
+      }
+
+      res.json({
+        success: true,
+        data: {
+          account_name: responseData.data.account_name,
+          account_number: responseData.data.account_number
+        }
+      });
+    } catch (error) {
+      console.error('Bank verification error:', error);
+      res.status(400).json({ success: false, error: error.message });
+    }
+  });
+
+  // Get banks list (migrated from Supabase Edge Functions)
+  app.get('/api/banks', async (req, res) => {
+    try {
+      const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
+      if (!PAYSTACK_SECRET_KEY) {
+        return res.status(500).json({ success: false, error: 'Paystack secret key not configured' });
+      }
+
+      const response = await fetch('https://api.paystack.co/bank', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${PAYSTACK_SECRET_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+
+      if (!data.status) {
+        return res.status(400).json({ success: false, error: data.message || 'Failed to fetch banks' });
+      }
+
+      // Filter Nigerian banks
+      const nigerianBanks = data.data.filter((bank: any) => 
+        bank.country === 'Nigeria' && bank.active === true
+      ).map((bank: any) => ({
+        name: bank.name,
+        code: bank.code,
+        slug: bank.slug
+      }));
+
+      res.json({
+        success: true,
+        data: nigerianBanks
+      });
+    } catch (error) {
+      console.error('Get banks error:', error);
+      res.status(400).json({ success: false, error: error.message });
+    }
+  });
+
+  // Paystack transfer (migrated from Supabase Edge Functions)
+  app.post('/api/paystack-transfer', authenticateToken, async (req: any, res) => {
+    try {
+      const { withdrawalId, action, notes } = req.body;
+
+      if (!withdrawalId || !action) {
+        return res.status(400).json({ success: false, error: 'Missing required parameters' });
+      }
+
+      const withdrawal = await storage.getWithdrawalRequestById(withdrawalId);
+      if (!withdrawal) {
+        return res.status(404).json({ success: false, error: 'Withdrawal request not found' });
+      }
+
+      // Check if user is admin
+      const profile = await storage.getProfileByUserId(req.user.userId);
+      if (!profile?.is_admin) {
+        return res.status(403).json({ success: false, error: 'Admin access required' });
+      }
+
+      if (action === 'approve') {
+        await approveWithdrawal(withdrawal, notes);
+        res.json({ success: true, message: 'Transfer initiated successfully' });
+      } else if (action === 'reject') {
+        await rejectWithdrawal(withdrawalId, notes);
+        res.json({ success: true, message: 'Withdrawal request rejected' });
+      } else {
+        res.status(400).json({ success: false, error: 'Invalid action' });
+      }
+    } catch (error) {
+      console.error('Transfer function error:', error);
+      res.status(400).json({ success: false, error: error.message });
     }
   });
 

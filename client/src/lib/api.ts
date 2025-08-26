@@ -131,6 +131,25 @@ class ApiClient {
   async getReferralData() {
     return this.request('/referrals');
   }
+
+  // Paystack methods (migrated from Supabase functions)
+  async getBanks() {
+    return this.request('/banks');
+  }
+
+  async verifyBankAccount(account_number: string, bank_code: string) {
+    return this.request('/verify-bank-account', {
+      method: 'POST',
+      body: JSON.stringify({ account_number, bank_code }),
+    });
+  }
+
+  async processTransfer(withdrawalId: string, action: string, notes?: string) {
+    return this.request('/paystack-transfer', {
+      method: 'POST',
+      body: JSON.stringify({ withdrawalId, action, notes }),
+    });
+  }
 }
 
 export const apiClient = new ApiClient();
