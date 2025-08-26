@@ -205,3 +205,4 @@ function App() {
 }
 
 export default App;
+<Route path="/support" element={<SupportPage />} />
