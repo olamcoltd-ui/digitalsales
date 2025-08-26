@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Route, Switch, useLocation } from 'wouter';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Layout from './components/Layout';
@@ -19,10 +19,12 @@ import SettingsPage from './pages/SettingsPage';
 import AboutPage from './pages/AboutPage';
 import ContactPage from './pages/ContactPage';
 import SupportPage from './pages/SupportPage';
+import ReferralsPage from './pages/ReferralsPage';
 
 // Protected Route Component
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading } = useAuth();
+  const [, setLocation] = useLocation();
 
   if (loading) {
     return (
@@ -33,7 +35,8 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   }
 
   if (!user) {
-    return <Navigate to="/auth" replace />;
+    setLocation('/auth');
+    return null;
   }
 
   return <>{children}</>;
@@ -55,151 +58,138 @@ const PlaceholderPage: React.FC<{ title: string; description: string }> = ({ tit
 function App() {
   return (
     <AuthProvider>
-      <Router>
-        <Layout>
-          <Routes>
-            {/* Public Routes */}
-            <Route path="/" element={<HomePage />} />
-            <Route path="/auth" element={<AuthPage />} />
-            <Route path="/products" element={<ProductsPage />} />
-            
-            {/* Protected Routes */}
-            <Route path="/dashboard" element={
-              <ProtectedRoute>
-                <DashboardPage />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/analytics" element={
-              <ProtectedRoute>
-                <AnalyticsPage />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/subscription" element={
-              <ProtectedRoute>
-                <SubscriptionPage />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/wallet" element={
-              <ProtectedRoute>
-                <WalletPage />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/admin" element={
-              <ProtectedRoute>
-                <AdminDashboardPage />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/product/:id" element={<ProductDetailPage />} />
+      <Layout>
+        <Switch>
+          {/* Public Routes */}
+          <Route path="/" component={HomePage} />
+          <Route path="/auth" component={AuthPage} />
+          <Route path="/products" component={ProductsPage} />
+          <Route path="/product/:id" component={ProductDetailPage} />
+          
+          {/* Protected Routes */}
+          <Route path="/dashboard">
+            <ProtectedRoute>
+              <DashboardPage />
+            </ProtectedRoute>
+          </Route>
+          
+          <Route path="/analytics">
+            <ProtectedRoute>
+              <AnalyticsPage />
+            </ProtectedRoute>
+          </Route>
+          
+          <Route path="/subscription">
+            <ProtectedRoute>
+              <SubscriptionPage />
+            </ProtectedRoute>
+          </Route>
+          
+          <Route path="/wallet">
+            <ProtectedRoute>
+              <WalletPage />
+            </ProtectedRoute>
+          </Route>
+          
+          <Route path="/admin">
+            <ProtectedRoute>
+              <AdminDashboardPage />
+            </ProtectedRoute>
+          </Route>
 
-            {/* Placeholder routes for footer links */}
-            <Route path="/about" element={
-              <AboutPage />
-            } />
-            
-            <Route path="/contact" element={
-              <ContactPage />
-            } />
-            
-            <Route path="/careers" element={
-              <PlaceholderPage 
-                title="Careers" 
-                description="Join our growing team of digital innovators" 
-              />
-            } />
-            
-            <Route path="/blog" element={
-              <PlaceholderPage 
-                title="Blog" 
-                description="Tips, insights, and success stories from digital entrepreneurs" 
-              />
-            } />
-            
-            <Route path="/privacy" element={
-              <PlaceholderPage 
-                title="Privacy Policy" 
-                description="How we protect and handle your personal information" 
-              />
-            } />
-            
-            <Route path="/terms" element={
-              <PlaceholderPage 
-                title="Terms of Service" 
-                description="Terms and conditions for using Olamco Digital Hub" 
-              />
-            } />
-            
-            <Route path="/support" element={
-              <SupportPage />
-            } />
+          <Route path="/profile">
+            <ProtectedRoute>
+              <ProfilePage />
+            </ProtectedRoute>
+          </Route>
+          
+          <Route path="/settings">
+            <ProtectedRoute>
+              <SettingsPage />
+            </ProtectedRoute>
+          </Route>
+          
+          <Route path="/referrals">
+            <ProtectedRoute>
+              <ReferralsPage />
+            </ProtectedRoute>
+          </Route>
+          
+          <Route path="/withdrawals">
+            <ProtectedRoute>
+              <WalletPage />
+            </ProtectedRoute>
+          </Route>
 
-            {/* Additional placeholder routes */}
-            <Route path="/profile" element={
-              <ProtectedRoute>
-                <ProfilePage />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/settings" element={
-              <ProtectedRoute>
-                <SettingsPage />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/referrals" element={
-              <ProtectedRoute>
-                <PlaceholderPage 
-                  title="My Referrals" 
-                  description="Track your referral earnings and performance" 
-                />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/withdrawals" element={
-              <ProtectedRoute>
-                <WalletPage />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/sales" element={
-              <ProtectedRoute>
-                <PlaceholderPage 
-                  title="Sales History" 
-                  description="View detailed history of all your sales" 
-                />
-              </ProtectedRoute>
-            } />
+          {/* Footer links */}
+          <Route path="/about" component={AboutPage} />
+          <Route path="/contact" component={ContactPage} />
+          <Route path="/support" component={SupportPage} />
+          
+          <Route path="/careers">
+            <PlaceholderPage 
+              title="Careers" 
+              description="Join our growing team of digital innovators" 
+            />
+          </Route>
+          
+          <Route path="/blog">
+            <PlaceholderPage 
+              title="Blog" 
+              description="Tips, insights, and success stories from digital entrepreneurs" 
+            />
+          </Route>
+          
+          <Route path="/privacy">
+            <PlaceholderPage 
+              title="Privacy Policy" 
+              description="How we protect and handle your personal information" 
+            />
+          </Route>
+          
+          <Route path="/terms">
+            <PlaceholderPage 
+              title="Terms of Service" 
+              description="Terms and conditions for using Olamco Digital Hub" 
+            />
+          </Route>
+          
+          <Route path="/sales">
+            <ProtectedRoute>
+              <PlaceholderPage 
+                title="Sales History" 
+                description="View detailed history of all your sales" 
+              />
+            </ProtectedRoute>
+          </Route>
 
-            {/* Catch all route */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </Layout>
-        
-        <Toaster
-          position="top-right"
-          toastOptions={{
-            duration: 4000,
+          {/* Default route */}
+          <Route>
+            <HomePage />
+          </Route>
+        </Switch>
+      </Layout>
+      
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#363636',
+            color: '#fff',
+          },
+          success: {
             style: {
-              background: '#363636',
-              color: '#fff',
+              background: '#10B981',
             },
-            success: {
-              style: {
-                background: '#10B981',
-              },
+          },
+          error: {
+            style: {
+              background: '#EF4444',
             },
-            error: {
-              style: {
-                background: '#EF4444',
-              },
-            },
-          }}
-        />
-      </Router>
+          },
+        }}
+      />
     </AuthProvider>
   );
 }

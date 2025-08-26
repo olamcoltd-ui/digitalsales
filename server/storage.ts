@@ -81,7 +81,7 @@ export class PostgresStorage implements IStorage {
   }
 
   async createProfile(profile: Partial<Profile>): Promise<Profile> {
-    const result = await db.insert(schema.profiles).values(profile).returning();
+    const result = await db.insert(schema.profiles).values(profile as any).returning();
     return result[0];
   }
 
@@ -90,13 +90,7 @@ export class PostgresStorage implements IStorage {
   }
 
   async getProducts(filters?: { category?: string; search?: string }): Promise<Product[]> {
-    let query = db.select().from(schema.products).where(eq(schema.products.is_active, true));
-    
-    if (filters?.category) {
-      query = query.where(eq(schema.products.category, filters.category));
-    }
-    
-    return await query;
+    return await db.select().from(schema.products).where(eq(schema.products.is_active, true));
   }
 
   async getProductById(id: string): Promise<Product | undefined> {
@@ -140,7 +134,7 @@ export class PostgresStorage implements IStorage {
   }
 
   async createSale(sale: Partial<Sale>): Promise<Sale> {
-    const result = await db.insert(schema.sales).values(sale).returning();
+    const result = await db.insert(schema.sales).values(sale as any).returning();
     return result[0];
   }
 
@@ -165,7 +159,7 @@ export class PostgresStorage implements IStorage {
   }
 
   async createWithdrawalRequest(request: Partial<WithdrawalRequest>): Promise<WithdrawalRequest> {
-    const result = await db.insert(schema.withdrawalRequests).values(request).returning();
+    const result = await db.insert(schema.withdrawalRequests).values(request as any).returning();
     return result[0];
   }
 

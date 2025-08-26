@@ -126,6 +126,11 @@ class ApiClient {
     this.token = token;
     localStorage.setItem('auth_token', token);
   }
+
+  // Referral methods
+  async getReferralData() {
+    return this.request('/referrals');
+  }
 }
 
 export const apiClient = new ApiClient();
