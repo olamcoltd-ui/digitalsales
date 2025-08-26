@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase } from '../lib/supabase';
+// Profile page - uses AuthContext for profile management
 import { 
   User, 
   Mail, 

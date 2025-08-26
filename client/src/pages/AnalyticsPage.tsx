@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase } from '../lib/supabase';
+import { dataService } from '../lib/dataService';
 import { 
   TrendingUp, 
   DollarSign, 

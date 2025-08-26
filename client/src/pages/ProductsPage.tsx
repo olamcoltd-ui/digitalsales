@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { supabase, Product } from '../lib/supabase';
+import { dataService, Product } from '../lib/dataService';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   Search, 
@@ -42,29 +42,18 @@ const ProductsPage: React.FC = () => {
   const fetchProducts = async () => {
     setLoading(true);
     try {
-      let query = supabase
-        .from('products')
-        .select('*')
-        .eq('is_active', true);
-
+      const filters: { category?: string; search?: string } = {};
+      
       if (selectedCategory !== 'all') {
-        query = query.eq('category', selectedCategory);
+        filters.category = selectedCategory;
       }
-
+      
       if (searchTerm) {
-        query = query.or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`);
+        filters.search = searchTerm;
       }
 
-      query = query.order(sortBy, { ascending: false });
-
-      const { data, error } = await query;
-
-      if (error) {
-        console.error('Error fetching products:', error);
-        toast.error('Failed to load products');
-      } else {
-        setProducts(data || []);
-      }
+      const data = await dataService.getProducts(filters);
+      setProducts(data || []);
     } catch (error) {
       console.error('Error fetching products:', error);
       toast.error('Failed to load products');

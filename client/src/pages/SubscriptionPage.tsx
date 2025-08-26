@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase, SubscriptionPlan, UserSubscription } from '../lib/supabase';
+import { dataService, SubscriptionPlan, UserSubscription } from '../lib/dataService';
 import { loadPaystackScript, initializePaystackPayment, formatAmountToKobo, generatePaymentReference } from '../lib/paystack';
 import { CheckCircle, Star, Zap, Crown, Shield } from 'lucide-react';
 import toast from 'react-hot-toast';

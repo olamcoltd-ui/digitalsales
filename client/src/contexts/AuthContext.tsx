@@ -1,12 +1,32 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, Session } from '@supabase/supabase-js';
-import { supabase, Profile } from '../lib/supabase';
+import { apiClient } from '../lib/api';
 import toast from 'react-hot-toast';
+
+interface User {
+  id: string;
+  email: string;
+}
+
+interface Profile {
+  id: string;
+  user_id: string;
+  email: string;
+  full_name?: string;
+  phone?: string;
+  bank_name?: string;
+  account_number?: string;
+  account_name?: string;
+  referral_code?: string;
+  referred_by?: string;
+  referred_by_code?: string;
+  is_admin: boolean;
+  created_at: string;
+  updated_at: string;
+}
 
 interface AuthContextType {
   user: User | null;
   profile: Profile | null;
-  session: Session | null;
   loading: boolean;
   signUp: (email: string, password: string, fullName: string, referralCode?: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
@@ -28,54 +48,30 @@ export const useAuth = () => {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id);
-      } else {
+    // Check if user is logged in on app start
+    const token = apiClient.getToken();
+    if (token) {
+      fetchProfile().catch(() => {
+        // If token is invalid, clear it
+        apiClient.signOut();
         setLoading(false);
-      }
-    });
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        if (session?.user) {
-          await fetchProfile(session.user.id);
-        } else {
-          setProfile(null);
-          setLoading(false);
-        }
-      }
-    );
-
-    return () => subscription.unsubscribe();
+      });
+    } else {
+      setLoading(false);
+    }
   }, []);
 
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', userId)
-        .single();
-
-      if (error) {
-        console.error('Error fetching profile:', error);
-      } else {
-        setProfile(data);
-      }
+      const profile = await apiClient.getProfile();
+      setProfile(profile);
+      setUser({ id: profile.user_id, email: profile.email });
     } catch (error) {
       console.error('Error fetching profile:', error);
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -83,58 +79,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signUp = async (email: string, password: string, fullName: string, referralCode?: string) => {
     try {
-      // Check if this is the admin email
-      const isAdmin = email === 'olamcoltd@gmail.com';
-      
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-            referral_code: referralCode,
-            is_admin: isAdmin
-          }
-        }
-      });
-
-      if (error) throw error;
-
-      if (data.user) {
-        // Create profile
-        const profileData: any = {
-          user_id: data.user.id,
-          email: email,
-          full_name: fullName,
-          referral_code: generateReferralCode(),
-          referred_by_code: referralCode || null,
-          is_admin: isAdmin
-        };
-
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert([profileData]);
-
-        if (profileError) {
-          console.error('Error creating profile:', profileError);
-        }
-
-        // Create wallet
-        const { error: walletError } = await supabase
-          .from('wallets')
-          .insert([{
-            user_id: data.user.id,
-            balance: 0,
-            total_earned: 0,
-            total_withdrawn: 0
-          }]);
-
-        if (walletError) {
-          console.error('Error creating wallet:', walletError);
-        }
-
-        toast.success('Account created successfully! Please check your email to verify your account.');
-      }
+      const response = await apiClient.signUp(email, password, fullName, referralCode);
+      setUser(response.user);
+      await fetchProfile();
+      toast.success('Account created successfully!');
     } catch (error: any) {
       toast.error(error.message || 'Error creating account');
       throw error;
@@ -143,12 +91,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signIn = async (email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
-
-      if (error) throw error;
+      const response = await apiClient.signIn(email, password);
+      setUser(response.user);
+      await fetchProfile();
       toast.success('Signed in successfully!');
     } catch (error: any) {
       toast.error(error.message || 'Error signing in');
@@ -158,8 +103,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+      apiClient.signOut();
+      setUser(null);
+      setProfile(null);
       toast.success('Signed out successfully!');
     } catch (error: any) {
       toast.error(error.message || 'Error signing out');
@@ -169,12 +115,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const resetPassword = async (email: string) => {
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`
-      });
-
-      if (error) throw error;
-      toast.success('Password reset email sent!');
+      // TODO: Implement password reset via API
+      toast.success('Password reset functionality coming soon!');
     } catch (error: any) {
       toast.error(error.message || 'Error sending reset email');
       throw error;
@@ -185,13 +127,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user) throw new Error('No user logged in');
 
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update(updates)
-        .eq('user_id', user.id);
-
-      if (error) throw error;
-
+      await apiClient.updateProfile(updates);
       setProfile(prev => prev ? { ...prev, ...updates } : null);
       toast.success('Profile updated successfully!');
     } catch (error: any) {
@@ -200,14 +136,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const generateReferralCode = () => {
-    return Math.random().toString(36).substr(2, 8).toUpperCase();
-  };
-
   const value = {
     user,
     profile,
-    session,
     loading,
     signUp,
     signIn,

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase, Wallet, Sale, UserSubscription, SubscriptionPlan } from '../lib/supabase';
+import { dataService, Wallet, Sale, UserSubscription, SubscriptionPlan } from '../lib/dataService';
 import { 
   Wallet as WalletIcon, 
   TrendingUp, 
@@ -39,68 +39,36 @@ const DashboardPage: React.FC = () => {
     if (!user) return;
 
     try {
-      // Fetch wallet
-      const { data: walletData } = await supabase
-        .from('wallets')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-
+      // Fetch wallet, sales, and subscription
+      const { wallet: walletData, sales: salesData, subscription: subscriptionData } = await dataService.getDashboardData();
+      
       if (walletData) {
         setWallet(walletData);
       }
-
-      // Fetch recent sales
-      const { data: salesData } = await supabase
-        .from('sales')
-        .select(`
-          *,
-          products (title, category)
-        `)
-        .eq('seller_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(10);
-
+      
       if (salesData) {
-        setSales(salesData);
+        setSales(salesData.slice(0, 10)); // Limit to 10 recent sales
       }
-
-      // Fetch active subscription
-      const { data: subscriptionData } = await supabase
-        .from('user_subscriptions')
-        .select(`
-          *,
-          subscription_plans (*)
-        `)
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .single();
-
+      
       if (subscriptionData) {
-        setSubscription(subscriptionData as any);
+        setSubscription(subscriptionData);
       }
 
       // Calculate stats
       const totalSales = salesData?.length || 0;
       const totalCommissions = salesData?.reduce((sum, sale) => sum + Number(sale.commission_amount), 0) || 0;
 
-      // Fetch referral count
-      const { count: referralCount } = await supabase
-        .from('referral_tracking')
-        .select('*', { count: 'exact' })
-        .eq('referrer_id', user.id);
-
-      // Fetch active products count
-      const { count: activeProducts } = await supabase
-        .from('products')
-        .select('*', { count: 'exact' })
-        .eq('is_active', true);
+      // Fetch additional stats
+      const [referralCount, activeProducts] = await Promise.all([
+        dataService.getReferralCount(),
+        dataService.getActiveProductsCount()
+      ]);
 
       setStats({
         totalSales,
         totalCommissions,
-        referralCount: referralCount || 0,
-        activeProducts: activeProducts || 0
+        referralCount,
+        activeProducts
       });
 
     } catch (error) {

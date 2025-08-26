@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase, Product, WithdrawalRequest, Sale } from '../lib/supabase';
+import { dataService, Product, WithdrawalRequest, Sale } from '../lib/dataService';
 import DragDropUpload from '../components/DragDropUpload';
 import { 
   Users, 
